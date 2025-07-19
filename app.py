@@ -7,7 +7,7 @@ from threading import Event
 BOT_TOKEN = '8068357378:AAF0D8xZJS9swZqF7Eh7McJ7yF0HCsyfo9c'
 GROUP_CHAT_ID = -4866598018
 PERSONAL_CHAT_ID = 5410478391
-
+Host = 'https://myloc-production.up.railway.app'
 app = Flask(__name__)
 
 waiting_for_response = False
@@ -19,8 +19,8 @@ alert_enabled = False
 
 # In-memory location storage
 location_data = {
-    'latitude': 0,
-    'longitude': 0
+    'latitude': 23.8103,
+    'longitude': 90.4125
 }
 angle_data = {
     'angle': None
@@ -51,7 +51,7 @@ def send_message_with_buttons():
         "inline_keyboard": [
             [
                 # {"text": "✅ Yes", "callback_data": "yes"},
-                {"text": "✅ Yes", "url": "https://2ad18025aa93.ngrok-free.app/reply?text=yes"}
+                {"text": "✅ Yes", "url": f"{Host}/reply?text=yes"}
             ]
         ]
     }
