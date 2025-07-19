@@ -11,12 +11,28 @@ app = Flask(__name__)
 
 waiting_for_response = False
 response_received = False
+does_update = True
+update_timer = None
+notification_enabled = True
+alert_enabled = False
+
+
+def auto_turn_on_after_delay():
+    global does_update
+    time.sleep(120)  # 2 minutes delay
+    does_update = True
+    print("⏳ does_update automatically turned ON after 2 minutes")
+
 
 # In-memory location storage
 location_data = {
-    'latitude': None,
-    'longitude': None
+    'latitude': 0,
+    'longitude': 0
 }
+angle_data = {
+    'angle': None
+}
+
 
 def send_message_sync(chat_id, text, reply_markup=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -28,14 +44,10 @@ def send_message_sync(chat_id, text, reply_markup=None):
         payload['reply_markup'] = reply_markup
     res = requests.post(url, json=payload)
     return res.json()
-
 def send_message_with_buttons():
     keyboard = {
         "inline_keyboard": [
-            [
-                {"text": "✅ Yes", "callback_data": "yes"},
-                {"text": "❌ No", "callback_data": "no"}
-            ]
+            [{"text": "✅ Yes", "callback_data": "yes"}]
         ]
     }
     send_message_sync(PERSONAL_CHAT_ID, "⚠️ Are you safe?", reply_markup=keyboard)
@@ -59,6 +71,31 @@ def start_alert():
     threading.Thread(target=wait_for_response).start()
 
     return "⏳ Safety check started. Waiting for your reply..."
+
+@app.route('/setoff', methods=['GET'])
+def setoff():
+    global does_update, update_timer
+    does_update = False
+    if update_timer and update_timer.is_alive():
+        pass
+    update_timer = threading.Thread(target=auto_turn_on_after_delay)
+    update_timer.daemon = True
+    update_timer.start()
+
+    return jsonify({'does_update': does_update, 'message': 'does_update turned OFF, will auto turn ON after 2 minutes'})
+
+@app.route('/set_angle', methods=['GET'])
+def set_angle():
+    angle = request.args.get('angle')
+
+    if not angle:
+        return jsonify({'error': 'Missing angle'}), 400
+
+    try:
+        angle_data['angle'] = float(angle)
+        return jsonify({'message': 'Angle updated successfully', 'angle': angle_data['angle']}), 200
+    except ValueError:
+        return jsonify({'error': 'Invalid angle'}), 400
 
 @app.route('/reply', methods=['GET'])
 def reply_safe():
@@ -108,17 +145,41 @@ def webhook():
 
     return jsonify({'status': 'ignored'})
 
+@app.route('/set_notification', methods=['GET'])
+def toggle_notification():
+    global notification_enabled
+    notification_enabled = not notification_enabled
+    return jsonify({
+        'message': 'Notification setting toggled.',
+        'notification': notification_enabled
+    }), 200
+
+@app.route('/setalert', methods=['GET'])
+def toggle_alert():
+    global alert_enabled
+    alert_enabled = not alert_enabled
+    return jsonify({
+        'message': 'Alert status toggled.',
+        'alert': alert_enabled
+    }), 200
+
+
 @app.route('/', methods=['GET'])
 def get_location():
     lat = location_data['latitude']
     lon = location_data['longitude']
+    angle = angle_data['angle']
 
     if lat is None or lon is None:
-        return jsonify({'error': 'Location not set yet'}), 404
+        return jsonify({'error': 'Location not set yet', 'does_update': does_update,'angle': angle,'notification': notification_enabled,'alert': alert_enabled}), 404
 
     return jsonify({
         'latitude': lat,
-        'longitude': lon
+        'longitude': lon,
+        'does_update': does_update,
+        'angle': angle,
+        'notification': notification_enabled,
+        'alert': alert_enabled
     }), 200
 
 @app.route('/testme')
